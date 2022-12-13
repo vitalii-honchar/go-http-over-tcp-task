@@ -1,12 +1,14 @@
 package tcp
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 	"log"
 	"net"
 )
 
-type TcpHandler func(any) (any, bool)
+type TcpHandler func(string) (string, bool)
 
 type TcpServer struct {
 	port     string
@@ -43,13 +45,12 @@ func (ts *TcpServer) Start() error {
 func (ts *TcpServer) handle(conn net.Conn) {
 	defer conn.Close()
 
-	var buff []byte
-	var nextData any
+	scanner := bufio.NewScanner(conn)
 
 	continueRead := true
 
-	for read, err := conn.Read(buff); err == nil && continueRead; {
-		nextData = buff[0:read]
+	for scanner.Scan() && continueRead {
+		nextData := scanner.Text()
 
 		for _, handler := range ts.handlers {
 			d, next := handler(nextData)
@@ -59,9 +60,6 @@ func (ts *TcpServer) handle(conn net.Conn) {
 				break
 			}
 		}
-	}
-
-	if res, ok := nextData.([]byte); ok {
-		conn.Write(res)
+		io.WriteString(conn, nextData)
 	}
 }
