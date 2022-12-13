@@ -2,7 +2,6 @@ package tcp
 
 import (
 	"fmt"
-	"io"
 	"log"
 	"net"
 )
@@ -37,12 +36,32 @@ func (ts *TcpServer) Start() error {
 		if err != nil {
 			continue
 		}
-		ts.handle(conn)
+		go ts.handle(conn)
 	}
 }
 
 func (ts *TcpServer) handle(conn net.Conn) {
 	defer conn.Close()
 
-	io.WriteString(conn, "I see you connected\n")
+	var buff []byte
+	var nextData any
+
+	continueRead := true
+
+	for read, err := conn.Read(buff); err == nil && continueRead; {
+		nextData = buff[0:read]
+
+		for _, handler := range ts.handlers {
+			d, next := handler(nextData)
+			nextData = d
+			if !next {
+				continueRead = false
+				break
+			}
+		}
+	}
+
+	if res, ok := nextData.([]byte); ok {
+		conn.Write(res)
+	}
 }
